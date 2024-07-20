@@ -1,0 +1,1255 @@
+VERSION 1.0 CLASS
+BEGIN
+  MultiUse = -1  'True
+  Persistable = 0  'NotPersistable
+  DataBindingBehavior = 0  'vbNone
+  DataSourceBehavior  = 0  'vbNone
+  MTSTransactionMode  = 0  'NotAnMTSObject
+END
+Attribute VB_Name = "clsSPWholeSale"
+Attribute VB_GlobalNameSpace = False
+Attribute VB_Creatable = True
+Attribute VB_PredeclaredId = False
+Attribute VB_Exposed = True
+'€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€
+' Rex S. Adversalo
+' XerSys Computing
+' Canaoalan, Binmaley, Pangasinan
+'
+' Copyright 2003-2004 and beyond
+' All Rights Reserved
+'
+'     Spareparts Sales Object
+'
+' ºººººººººººººººººººººººººººººººººººººººººººººººººººººººººººººººººººººººººººººººººººººººººº
+' €  All  rights reserved. No part of this  software  €€  This Software is Owned by        €
+' €  may be reproduced or transmitted in any form or  €€                                   €
+' €  by   any   means,  electronic   or  mechanical,  €€    GUANZON MERCHANDISING CORP.    €
+' €  including recording, or by information  storage  €€     Guanzon Bldg. Perez Blvd.     €
+' €  and  retrieval  systems, without  prior written  €€           Dagupan City            €
+' €  from the author.                                 €€  Tel No. 522-1085 ; 522-0863      €
+' ºººººººººººººººººººººººººººººººººººººººººººººººººººººººººººººººººººººººººººººººººººººººººº
+'
+' ==========================================================================================
+'  XerSys [ 10/29/2004 10:00 am ]
+'     Start creating this object.
+'  XerSys [ 12/06/2004 10:10 am ]
+'     Finalized coding this object.
+'  XerSys [ 12/15/2004 03:52 pm ]
+'     Oh boy, till now, i hadn't finalized this object yet. Nevertheless lets proccee
+'€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€
+Option Explicit
+
+Private Type CheckInfo
+   CheckNox As String
+   AcctNoxx As String
+   BankName As String
+   CheckDte As Date
+   Amountxx As Double
+End Type
+
+Private Type ReceiptInfo
+   TransNox As String
+   ORNoxxxx As String
+   TranTotl As Double
+   CashAmtx As Double
+   CheckAmt As Double
+   Remarksx As String
+End Type
+
+Private p_oAppDrivr As ApplicationDriver
+Private WithEvents p_oBaseClas As MasterDetailBase
+Attribute p_oBaseClas.VB_VarHelpID = -1
+Private p_axChecks(4) As CheckInfo
+Private p_axReceipt As ReceiptInfo
+
+Private p_sBranchCd As String
+Private p_sFullName As String
+Private p_sAddressx As String
+
+Private pbInitTran As Boolean
+Private pnCtr As Long
+
+Public Event DetailRetrieved(ByVal Index As Integer)
+Public Event MasterRetrieved(ByVal Index As Integer)
+
+Property Set AppDriver(oAppDriver As ApplicationDriver)
+   Set p_oAppDrivr = oAppDriver
+End Property
+
+Property Get Branch() As String
+   Branch = p_sBranchCd
+End Property
+
+Property Let Branch(ByVal Value As String)
+   p_sBranchCd = Value
+End Property
+
+Property Get Checks(ByVal Row As Integer, ByVal Index As Variant) As Variant
+   If Row > 4 Then Exit Property
+
+   Select Case Index
+      Case 0, "CheckNox"
+         Checks = p_axChecks(Row).CheckNox
+      Case 1, "sAcctNoxx"
+         Checks = p_axChecks(Row).AcctNoxx
+      Case 2, "sBankName"
+         Checks = p_axChecks(Row).BankName
+      Case 3, "dCheckDte"
+         Checks = p_axChecks(Row).CheckDte
+      Case 4, "nAmountxx"
+         Checks = p_axChecks(Row).Amountxx
+   End Select
+End Property
+
+Property Let Checks(ByVal Row As Integer, ByVal Index As Variant, ByVal Value As Variant)
+   If Row > 4 Then Exit Property
+
+   Select Case Index
+      Case 0, "CheckNox"
+         p_axChecks(Row).CheckNox = Value
+      Case 1, "sAcctNoxx"
+         p_axChecks(Row).AcctNoxx = Value
+      Case 2, "sBankName"
+         p_axChecks(Row).BankName = Value
+      Case 3, "dCheckDte"
+         p_axChecks(Row).CheckDte = Value
+      Case 4, "nAmountxx"
+         p_axChecks(Row).Amountxx = Value
+   End Select
+End Property
+
+Property Get Detail(ByVal Row As Long, Index As Variant) As Variant
+   On Error Resume Next
+
+   If pbInitTran = False Then Exit Property
+
+   Detail = p_oBaseClas.Detail(Row, Index)
+End Property
+
+Property Let Detail(ByVal Row As Long, Index As Variant, Value As Variant)
+   On Error Resume Next
+
+   If pbInitTran = False Then Exit Property
+
+   If Not IsNumeric(Index) Then Index = LCase(Index)
+   Select Case Index
+   Case 1, "sbarrcode"
+      getDetail Row, 1, Value, False
+   Case 2, "sdescript"
+      getDetail Row, 2, Value, False
+   Case Else
+      p_oBaseClas.Detail(Row, Index) = Value
+   End Select
+End Property
+
+Property Get Master(Index As Variant) As Variant
+   If pbInitTran = False Then Exit Property
+
+   If Not IsNumeric(Index) Then Index = LCase(Index)
+   Select Case Index
+   Case 4, "xfullname"
+      Master = p_sFullName
+   Case 5, "xaddressx"
+      Master = p_sAddressx
+   Case Else
+      Master = p_oBaseClas.Master(Index)
+   End Select
+End Property
+
+Property Let Master(Index As Variant, Value As Variant)
+   If pbInitTran = False Then Exit Property
+
+   If Not IsNumeric(Index) Then Index = LCase(Index)
+   Select Case Index
+   Case 3, "scompnynm"
+      getCompany Value, False
+   Case 6, "stermidxx"
+      getTerm Value, False
+   Case Else
+      p_oBaseClas.Master(Index) = Value
+   End Select
+End Property
+
+Property Get Receipt(ByVal Index As Variant) As Variant
+   Select Case Index
+      Case 0, "sTransNox"
+         Receipt = p_axReceipt.TransNox
+      Case 1, "sORNoxxxx"
+         Receipt = p_axReceipt.ORNoxxxx
+      Case 2, "nTranTotl"
+         Receipt = p_axReceipt.TranTotl
+      Case 3, "nCashAmtx"
+         Receipt = p_axReceipt.CashAmtx
+      Case 4, "nCheckAmt"
+         Receipt = p_axReceipt.CheckAmt
+      Case 5, "sRemarksx"
+         Receipt = p_axReceipt.Remarksx
+   End Select
+End Property
+
+Property Let Receipt(ByVal Index As Variant, ByVal Value As Variant)
+   Select Case Index
+      Case 0, "sTransNox"
+      Case 1, "sORNoxxxx"
+         p_axReceipt.ORNoxxxx = Value
+      Case 2, "nTranTotl"
+         p_axReceipt.TranTotl = Value
+      Case 3, "nCashAmtx"
+         p_axReceipt.CashAmtx = Value
+      Case 4, "nCheckAmt"
+         p_axReceipt.CheckAmt = Value
+      Case 5, "sRemarksx"
+         p_axReceipt.Remarksx = Value
+   End Select
+End Property
+
+Property Get ItemCount() As Long
+   If pbInitTran = False Then Exit Property
+
+   ItemCount = p_oBaseClas.ItemCount
+End Property
+
+Function InitTransaction() As Boolean
+   Dim lsOldProc As String
+
+   lsOldProc = p_oAppDrivr.ProcName("InitTransaction")
+   On Error GoTo errProc
+   InitTransaction = False
+
+   If isAppDriverOK(p_oAppDrivr) = False Then GoTo endProc
+
+   Set p_oBaseClas = New MasterDetailBase
+
+   With p_oBaseClas
+      Set .AppDriver = p_oAppDrivr
+      .MasterTable = "SP_WSO_Master"
+      .DetailTable = "SP_WSO_Detail"
+
+      .MasterQuery = "SELECT" & _
+                        "  a.sTransNox" & _
+                        ", a.dTransact" & _
+                        ", a.sEstimtNo" & _
+                        ", b.sCompnyNm" & _
+                        ", b.sLastName + ', ' + b.sFrstName + ' ' + b.sMiddName xFullName" & _
+                        ", b.sAddressx + ', ' + c.sTownName + ', ' + d.sProvName xAddressx" & _
+                        ", e.sTermName" & _
+                        ", a.nTranTotl" & _
+                        ", a.nDiscRate" & _
+                        ", a.dDueDatex" & _
+                        ", a.nAddDiscx" & _
+                        ", a.nFreightx" & _
+                        ", a.nNetTotal" & _
+                        ", a.nAmtPaidx" & _
+                        ", a.sRemarksx" & _
+                        ", a.cTranStat" & _
+                        ", a.sApproved" & _
+                        ", a.nRightsxx" & _
+                        ", a.sModified" & _
+                        ", a.dModified" & _
+                        ", a.sClientID" & _
+                        ", a.sTermIDxx" & _
+                        ", f.nDiscount"
+      .MasterQuery = .MasterQuery & _
+                        ", f.nCredLimt" & _
+                        ", f.nABalance" & _
+                     " FROM " & .MasterTable & " a" & _
+                        ", Client_Master b" & _
+                        ", TownCity c" & _
+                        ", Province d" & _
+                        ", Term e" & _
+                        ", SP_Customer f" & _
+                     " WHERE a.sClientID = b.sClientID" & _
+                        " AND a.sClientId = f.sClientID" & _
+                        " AND b.sTownIDxx = c.sTownIDxx" & _
+                        " AND c.sProvIDxx = d.sProvIDxx" & _
+                        " AND a.sTermIDxx = e.sTermIDxx" & _
+                        " AND f.sBranchCd = " & strParm(p_sBranchCd)
+                  
+      .DetailQuery = "SELECT" & _
+                        "  a.nEntryNox" & _
+                        ", a.sBarrCode" & _
+                        ", b.sDescript" & _
+                        ", d.sTypeName" & _
+                        ", e.sModelNme" & _
+                        ", c.nQtyOnHnd" & _
+                        ", a.nUnitPrce" & _
+                        ", a.nQuantity" & _
+                        ", a.nDiscount" & _
+                        ", a.sTransNox" & _
+                        ", a.dModified" & _
+                        ", c.nQtyOnHnd + a.nQuantity xQtyOnHnd" & _
+                        ", c.nSMaxDisc" & _
+                        ", c.nMMaxDisc" & _
+                        ", c.nSelPrice"
+      .DetailQuery = .DetailQuery & _
+                     " FROM " & .DetailTable & " a" & _
+                        ", Spareparts b" & _
+                              " LEFT JOIN SP_Model e" & _
+                                 " ON b.sModelIDx = e.sModelIDx" & _
+                        ", SP_Inventory c" & _
+                        ", SP_Type d" & _
+                     " WHERE a.sBarrCode = b.sBarrCode" & _
+                        " AND a.sBarrCode = c.sBarrCode" & _
+                        " AND b.cPartType = d.cPartType" & _
+                        " AND c.sBranchCd = " & strParm(p_sBranchCd)
+      .Reference = "a.sTransNox|a.sTransNox"
+
+      InitTransaction = .InitTransaction
+
+      .BrowseQuery(0) = "SELECT" & _
+                           "  a.sTransNox" & _
+                           ", b.sCompnyNm" & _
+                           ", a.dTransact" & _
+                        " FROM " & .MasterTable & " a" & _
+                           ", Client_Master b" & _
+                        " WHERE a.sClientId = b.sClientID" & _
+                        " ORDER BY b.sCompnyNm" & _
+                           ", a.dTransact"
+      .BrowseColumn(0) = "sTransNox»sCompnyNm»dTransact"
+      .BrowseTitle(0) = "Transaction No»Company Name»Date"
+      .BrowseCriteria(0) = "a.sTransNox»b.sCompnyNm»a.dTransact"
+      .BrowseFormat(0) = "@@-@@@@@@»@»MMMM DD, YYYY"
+
+      .BrowseDetailQuery(0) = "SELECT" & _
+                                 "  a.sBarrCode" & _
+                                 ", a.sDescript" & _
+                                 ", c.sTypeName" & _
+                                 ", d.sModelNme" & _
+                                 ", b.nQtyOnHnd" & _
+                                 ", b.nSelPrice" & _
+                                 ", b.nSMaxDisc" & _
+                                 ", b.nMMaxDisc" & _
+                              " FROM Spareparts a" & _
+                                    " LEFT JOIN SP_Model d" & _
+                                       " ON a.sModelIDx = d.sModelIDx" & _
+                                 ", SP_Inventory b" & _
+                                 ", SP_Type c" & _
+                              " WHERE a.sBarrCode = b.sBarrCode" & _
+                                 " AND a.cPartType = c.cPartType" & _
+                                 " AND b.sBranchCd = " & strParm(p_sBranchCd)
+      .BrowseDetailColumn(0) = "sBarrCode»sDescript»sTypeName»sModelNme»nQtyOnHnd»nSelPrice"
+      .BrowseDetailTitle(0) = "Bar Code»Description»Type»Model»QtyOnHand»Price"
+      .BrowseDetailFormat(0) = "@»@»@»@»#0»#,##0.00"
+      .BrowseDetailCriteria(0) = "a.sBarrCode»a.sDescript"
+
+      ' Query statement for the Customer field
+      .BrowseQuery(20) = "SELECT" & _
+                           "  a.sClientID" & _
+                           ", a.sCompnyNm" & _
+                           ", a.sLastName + ', ' + a.sFrstName as xFullName" & _
+                           ", a.sAddressx + ', ' + c.sTownName + ', ' + d.sProvName as xAddressx" & _
+                           ", e.sTermName" & _
+                           ", b.nCredLimt" & _
+                           ", b.nABalance" & _
+                           ", b.nDiscount" & _
+                        " FROM Client_Master a" & _
+                           ", SP_Customer b" & _
+                                 " LEFT JOIN Term e" & _
+                                    " ON b.sTermIDxx = e.sTermIDxx" & _
+                           ", TownCity c" & _
+                           ", Province d" & _
+                        " WHERE a.sClientID = b.sClientID" & _
+                           " AND a.sTownIDxx = c.sTownIdxx" & _
+                           " AND c.sProvIDxx = d.sProvIDxx" & _
+                           " AND b.cRecdStat = " & strParm(xeRecStateActive) & _
+                           " AND b.sBranchCd = " & strParm(p_sBranchCd)
+      .BrowseColumn(20) = "sClientID»sCompnyNm»xFullName»xAddressx"
+      .BrowseTitle(20) = "Client ID»Company Name»Owner»Address"
+      .BrowseCriteria(20) = "a.sClientID»a.sCompnyNm"
+
+      ' Query statement for the term field
+      .BrowseQuery(22) = "SELECT" & _
+                        "  sTermIDxx" & _
+                        ", sTermName" & _
+                        ", nTermDays" & _
+                        ", nDiscDays" & _
+                        ", nDiscount" & _
+                     " FROM Term" & _
+                     " WHERE cRecdStat = " & xeRecStateActive
+      .BrowseColumn(22) = "sTermName»nTermDays»nDiscDays»nDiscount"
+      .BrowseTitle(22) = "Term Name»Term»Disc Days»Disc"
+      .BrowseFormat(22) = "@»0 Day/s»0 Day/s»0.00"
+   End With
+
+   pbInitTran = InitTransaction
+
+endProc:
+   p_oAppDrivr.ProcName lsOldProc
+   Exit Function
+errProc:
+   ShowError lsOldProc
+End Function
+
+Function NewTransaction() As Boolean
+   Dim lsOldProc As String
+   
+   lsOldProc = p_oAppDrivr.ProcName("NewTransaction")
+   On Error GoTo errProc
+   
+   If pbInitTran Then NewTransaction = p_oBaseClas.NewTransaction
+   
+endProc:
+   p_oAppDrivr.ProcName lsOldProc
+   Exit Function
+errProc:
+   ShowError lsOldProc
+End Function
+
+Function SaveTransaction() As Boolean
+   Dim lsOldProc As String
+   
+   lsOldProc = p_oAppDrivr.ProcName("SaveTransaction")
+   On Error GoTo errProc
+   
+   If pbInitTran Then SaveTransaction = p_oBaseClas.SaveTransaction
+   
+endProc:
+   p_oAppDrivr.ProcName lsOldProc
+   Exit Function
+errProc:
+   ShowError lsOldProc
+End Function
+
+Function OpenTransaction(sTransNo As String) As Boolean
+   Dim lsOldProc As String
+   
+   lsOldProc = p_oAppDrivr.ProcName("OpenTransaction")
+   On Error GoTo errProc
+   
+   If pbInitTran Then OpenTransaction = p_oBaseClas.OpenTransaction(sTransNo)
+   
+endProc:
+   p_oAppDrivr.ProcName lsOldProc
+   Exit Function
+errProc:
+   ShowError lsOldProc
+End Function
+
+Function DeleteTransaction() As Boolean
+   Dim lsOldProc As String
+   
+   lsOldProc = p_oAppDrivr.ProcName("DeleteTransaction")
+   On Error GoTo errProc
+   
+   If pbInitTran Then DeleteTransaction = p_oBaseClas.DeleteTransaction
+   
+endProc:
+   p_oAppDrivr.ProcName lsOldProc
+   Exit Function
+errProc:
+   ShowError lsOldProc
+End Function
+
+Function SearchTransaction(Optional sSearch As Variant, Optional bByCode As Variant) As Boolean
+   Dim lsOldProc As String
+   Dim lsRecord As String
+   Dim lsValue As String
+   Dim lsField As String
+   Dim lsDescript As String
+
+   lsOldProc = p_oAppDrivr.ProcName("SearchTransaction")
+   On Error GoTo errProc
+   SearchTransaction = False
+
+   If pbInitTran = False Then GoTo endProc
+
+   If Not IsMissing(sSearch) Then
+      lsValue = sSearch
+      lsField = "a.sTransNox"
+      lsDescript = ""
+      If Not IsMissing(bByCode) Then
+         If bByCode = False Then
+            lsField = "b.sCompnyNm"
+            lsDescript = "b.sCompnyNm"
+         End If
+      End If
+   End If
+
+   SearchTransaction = p_oBaseClas.SearchTransaction(lsValue, lsField, lsDescript)
+
+endProc:
+   p_oAppDrivr.ProcName lsOldProc
+   Exit Function
+errProc:
+   ShowError lsOldProc
+End Function
+
+Function PostTransaction(ByVal sTransNo As String) As Boolean
+   Dim loClient As clsClient
+   Dim lsOldProc As String
+   
+   lsOldProc = p_oAppDrivr.ProcName("PostTransaction")
+   On Error GoTo errProc
+   
+   Set loClient = New clsClient
+   Set loClient.AppDriver = p_oAppDrivr
+   loClient.Branch = p_sBranchCd
+   
+   With p_oBaseClas
+      If .Master("nAmtPaidx") > 0 Then
+         Cancel = Not SaveReceipt
+         If Cancel Then GoTo endProc
+      End If
+   
+      ' update the client ledger
+      loClient.InitTransaction
+      loClient.ClientType = xeClientCustomer
+      loClient.ClientId = .Master("sClientID")
+      loClient.DebitAmount = .Master("nTranTotl")
+      loClient.CreditAmount = .Master("nAmtPaidx")
+      loClient.SourceSystem = "SP"
+      loClient.TransactDate = .Master("dTransact")
+      If loClient.Sales(p_oBaseClas.Master("sTransNox"), False) = False Then
+         Cancel = True
+         GoTo endProc
+      End If
+   
+      If pbInitTran Then PostTransaction = .PostTransaction(sTransNo)
+   End With
+   
+endProc:
+   Set loClient = Nothing
+   p_oAppDrivr.ProcName lsOldProc
+   Exit Function
+errProc:
+   ShowError lsOldProc
+End Function
+
+Function CancelTransaction() As Boolean
+   Dim lsOldProc As String
+   
+   lsOldProc = p_oAppDrivr.ProcName("CancelTransaction")
+   On Error GoTo errProc
+   
+   If pbInitTran Then CancelTransaction = p_oBaseClas.CancelTransaction()
+   
+endProc:
+   p_oAppDrivr.ProcName lsOldProc
+   Exit Function
+errProc:
+   ShowError lsOldProc
+End Function
+
+Function CloseTransaction(ByVal sTransNo As String) As Boolean
+   Dim lsOldProc As String
+   
+   lsOldProc = p_oAppDrivr.ProcName("CloseTransaction")
+   On Error GoTo errProc
+   
+   If pbInitTran Then CloseTransaction = p_oBaseClas.CloseTransaction(sTransNo)
+   
+endProc:
+   p_oAppDrivr.ProcName lsOldProc
+   Exit Function
+errProc:
+   ShowError lsOldProc
+End Function
+
+Function UpdateTransaction() As Boolean
+   Dim lsOldProc As String
+   
+   lsOldProc = p_oAppDrivr.ProcName("UpdateTransaction")
+   On Error GoTo errProc
+   
+   p_oBaseClas.EditMode = xeModeUpdate
+   
+endProc:
+   p_oAppDrivr.ProcName lsOldProc
+   Exit Function
+errProc:
+   ShowError lsOldProc
+End Function
+
+Function AddDetail() As Boolean
+   AddDetail = p_oBaseClas.AddDetail
+
+   pnCtr = p_oBaseClas.ItemCount - 1
+   With p_oBaseClas
+      .Detail(pnCtr, "nEntryNox") = pnCtr + 1
+      .Detail(pnCtr, "sBarrCode") = ""
+      .Detail(pnCtr, "sDescript") = ""
+      .Detail(pnCtr, "sTypeName") = ""
+      .Detail(pnCtr, "sModelNme") = ""
+      .Detail(pnCtr, "nQtyOnHnd") = 0
+      .Detail(pnCtr, "nUnitPrce") = 0#
+      .Detail(pnCtr, "nQuantity") = 0
+      .Detail(pnCtr, "nDiscount") = 0
+      .Detail(pnCtr, "sTransNox") = ""
+   End With
+End Function
+
+Function DeleteDetail(ByVal Index As Long) As Boolean
+   DeleteDetail = p_oBaseClas.DeleteDetail(Index)
+End Function
+
+Function SearchDetail(ByVal Row As Long, _
+                        ByVal Index As Variant, _
+                        Optional Value As Variant = "") As Boolean
+   Dim lsOldProc As String
+
+   lsOldProc = p_oAppDrivr.ProcName("SearchDetail")
+   On Error GoTo errProc
+   SearchDetail = False
+
+   If pbInitTran = False Then GoTo endProc
+
+   Index = LCase(Index)
+   Select Case Index
+   Case 1, "sbarrcode"
+      getDetail Row, Index, Value, True
+   Case 2, "sdescript"
+      getDetail Row, Index, Value, True
+   End Select
+   SearchDetail = True
+
+endProc:
+   p_oAppDrivr.ProcName lsOldProc
+   Exit Function
+errProc:
+   ShowError lsOldProc
+End Function
+
+Function SearchMaster(ByVal Index As Variant, Optional Value As Variant = "") As Boolean
+   If pbInitTran = False Then Exit Function
+   
+   If Not IsNumeric(Index) Then Index = LCase(Index)
+   Select Case Index
+   Case 3, "scompnynm"
+      getCompany Value, True
+   Case 6, "stermidxx"
+      getTerm Value, True
+   Case Else
+      SearchMaster = p_oBaseClas.SearchMaster(Index)
+   End Select
+   SearchMaster = True
+End Function
+
+Private Sub ShowError(ByVal lsProcName As String)
+   With p_oAppDrivr
+      .ShowError "clsMCAcceptance", .ProcName(lsProcName), Err.Number, Err.Description, Erl
+   End With
+   With Err
+      .Raise .Number, .Source, .Description
+   End With
+End Sub
+
+Private Sub getDetail(ByVal lnRow As Integer, _
+                        ByVal lnIndex As Integer, _
+                        ByVal lsValue As String, _
+                        ByVal lbSearch As Boolean)
+   Dim lsDetail As String
+   Dim lasDetail() As String
+   Dim lsOldProc As String
+
+   With p_oBaseClas
+      If lsValue <> "" Then
+         If lnIndex = 1 Then     ' Bar Code
+            If lsValue = .Detail(lnRow, "sBarrCode") Then GoTo endProc
+            lsDetail = "a.sBarrcode = " & strParm(Trim(lsValue))
+         Else                    ' Description
+            If lsValue = .Detail(lnRow, "sDescript") Then GoTo endProc
+            If lbSearch Then
+               lsDetail = "a.sDescript LIKE " & strParm(Trim(lsValue) & "%")
+            Else
+               lsDetail = "a.sDescript = " & strParm(Trim(lsValue))
+            End If
+         End If
+      ElseIf lbSearch = False Then
+         GoTo endWithClear
+      End If
+   
+      lsDetail = .getDetail(lnRow, lsDetail)
+      If lsDetail = Empty Then
+         If lbSearch = False Then
+            GoTo endWithClear
+         Else
+            GoTo endProc
+         End If
+      End If
+      lasDetail = Split(lsDetail, "»")
+      
+      .Detail(lnRow, "sBarrCode") = lasDetail(0)
+      .Detail(lnRow, "sDescript") = lasDetail(1)
+      .Detail(lnRow, "sTypeName") = lasDetail(2)
+      .Detail(lnRow, "sModelNme") = lasDetail(3)
+      .Detail(lnRow, "nQtyOnHnd") = lasDetail(4)
+      .Detail(lnRow, "nUnitPrce") = lasDetail(5)
+      .Detail(lnRow, "nSelPrice") = lasDetail(5)
+      .Detail(lnRow, "nSMaxDisc") = lasDetail(6)
+      .Detail(lnRow, "nMMaxDisc") = lasDetail(7)
+      .Detail(lnRow, "nQuantity") = 0
+      .Detail(lnRow, "nDiscount") = 0
+   End With
+   RaiseEvent DetailRetrieved(1)
+   RaiseEvent DetailRetrieved(2)
+   RaiseEvent DetailRetrieved(3)
+   RaiseEvent DetailRetrieved(4)
+   RaiseEvent DetailRetrieved(5)
+   RaiseEvent DetailRetrieved(6)
+   RaiseEvent DetailRetrieved(7)
+   
+endProc:
+   p_oAppDrivr.ProcName lsOldProc
+   Exit Sub
+endWithClear:
+   With p_oBaseClas
+      .Detail(lnRow, "sBarrCode") = ""
+      .Detail(lnRow, "sDescript") = ""
+      .Detail(lnRow, "sTypeName") = ""
+      .Detail(lnRow, "sModelNme") = ""
+      .Detail(lnRow, "nQtyOnHnd") = 0
+      .Detail(lnRow, "nUnitPrce") = 0#
+      .Detail(lnRow, "nSelPrice") = 0#
+      .Detail(lnRow, "nSMaxDisc") = 0#
+      .Detail(lnRow, "nMMaxDisc") = 0#
+      .Detail(lnRow, "nQuantity") = 0
+      .Detail(lnRow, "nDiscount") = 0
+   End With
+   RaiseEvent DetailRetrieved(1)
+   RaiseEvent DetailRetrieved(2)
+   RaiseEvent DetailRetrieved(3)
+   RaiseEvent DetailRetrieved(4)
+   RaiseEvent DetailRetrieved(5)
+   RaiseEvent DetailRetrieved(6)
+   RaiseEvent DetailRetrieved(7)
+   GoTo endProc
+errProc:
+   ShowError lsOldProc
+End Sub
+
+Private Sub getCompany(ByVal lsValue As String, ByVal lbSearch As Boolean)
+   Dim lsMaster As String
+   Dim lasMaster() As String
+   Dim lsOldProc As String
+
+   If lsValue <> "" Then
+      If lsValue = p_oBaseClas.Master("sCompnyNm") Then GoTo endProc
+      
+      If lbSearch Then
+         lsMaster = "a.sCompnyNm LIKE " & strParm(Trim(lsValue) & "%")
+      Else
+         lsMaster = "a.sCompnyNm = " & strParm(Trim(lsValue))
+      End If
+   ElseIf lbSearch = False Then
+      GoTo endWithClear
+   End If
+
+   lsMaster = p_oBaseClas.GetMaster(20, lsMaster)
+   If lsMaster = Empty Then
+      If lbSearch = False Then
+         GoTo endWithClear
+      Else
+         GoTo endProc
+      End If
+   End If
+   lasMaster = Split(lsMaster, "»")
+   With p_oBaseClas
+      .Master("sCompnyNm") = lasMaster(1)
+      .Master("sClientID") = lasMaster(0)
+      .Master("nCredLimt") = lasMaster(5)
+      .Master("nABalance") = lasMaster(6)
+      .Master("nDiscount") = lasMaster(7)
+      
+      p_sFullName = lasMaster(2)
+      p_sAddressx = lasMaster(3)
+      RaiseEvent MasterRetrieved(3)
+      RaiseEvent MasterRetrieved(4)
+      RaiseEvent MasterRetrieved(5)
+      
+      getTerm lasMaster(4), False
+   End With
+
+endProc:
+   p_oAppDrivr.ProcName lsOldProc
+   Exit Sub
+endWithClear:
+   With p_oBaseClas
+      .Master("sCompnyNm") = ""
+      .Master("sClientId") = ""
+      .Master("nCredLimt") = 0#
+      .Master("nABalance") = 0#
+      .Master("nDiscount") = 0#
+      p_sFullName = ""
+      p_sAddressx = ""
+   End With
+   RaiseEvent MasterRetrieved(3)
+   RaiseEvent MasterRetrieved(4)
+   RaiseEvent MasterRetrieved(5)
+   GoTo endProc
+errProc:
+   ShowError lsOldProc
+End Sub
+
+Private Sub getTerm(ByVal lsValue As String, ByVal lbSearch As Boolean)
+   Dim lsMaster As String
+   Dim lasMaster() As String
+   Dim lsOldProc As String
+
+   With p_oBaseClas
+      If lsValue <> "" Then
+         If lsValue = .Master("sTermName") Then GoTo endProc
+         
+         If lbSearch Then
+            lsMaster = "a.sTermName LIKE " & strParm(Trim(lsValue) & "%")
+         Else
+            lsMaster = "a.sTermName = " & strParm(Trim(lsValue))
+         End If
+      ElseIf lbSearch = False Then
+         GoTo endWithClear
+      End If
+   
+      lsMaster = .GetMaster(22, lsMaster)
+      If lsMaster = Empty Then
+         If lbSearch = False Then
+            GoTo endWithClear
+         Else
+            GoTo endProc
+         End If
+      End If
+      lasMaster = Split(lsMaster, "»")
+      
+      .Master("sTermName") = lasMaster(1)
+      .Master("dDueDatex") = DateAdd("d", lasMaster(2), .Master("dTransact"))
+   End With
+   RaiseEvent MasterRetrieved(6)
+   RaiseEvent MasterRetrieved(9)
+
+endProc:
+   p_oAppDrivr.ProcName lsOldProc
+   Exit Sub
+endWithClear:
+   With p_oBaseClas
+      .Master("sTermName") = ""
+      .Master("dDueDatex") = .Master("dTransact")
+   End With
+   RaiseEvent MasterRetrieved(6)
+   RaiseEvent MasterRetrieved(9)
+   GoTo endProc
+errProc:
+   ShowError lsOldProc
+End Sub
+
+Private Function UndoTransaction() As Boolean
+   Dim loSpareparts As clsSpareparts
+   Dim loClient As clsClient
+   Dim lorsDetail As Recordset
+   Dim lsSQL As String
+   Dim lnRow As Long
+   Dim lsOldProc As String
+
+   lsOldProc = p_oAppDrivr.ProcName("UndoTransaction")
+   On Error GoTo errProc
+   UndoTransaction = False
+
+   With p_oBaseClas
+      Set loSpareparts = New clsSpareparts
+      Set loSpareparts.AppDriver = p_oAppDrivr
+      loSpareparts.InitTransaction
+      loSpareparts.Branch = .Master("sBranchCd")
+      loSpareparts.TransactDate = .MasterOriginal("dTransact")
+      
+      Set loClient = New clsClient
+      Set loClient.AppDriver = p_oAppDrivr
+      loClient.InitTransaction
+   
+      lsSQL = AddCondition(.DetailQuery, _
+                  "a.sTransNox = " & strParm(.Master("sTransNox")) & _
+                  " AND a.sBranchCd = " & strParm(.Master("sBranchCd")))
+
+      Set lorsDetail = New Recordset
+      lorsDetail.Open lsSQL, p_oAppDrivr.Connection, , , adCmdText
+
+      If lorsDetail.EOF Then GoTo endProc
+      Do
+         ' undo spareparts transaction
+         loSpareparts.EntryNo = lorsDetail("nEntryNox")
+         loSpareparts.BarrCode = lorsDetail("sBarrCode")
+         loSpareparts.Quantity = lorsDetail("nQuantity")
+         
+         If loSpareparts.Sales(.Master("sTransNox"), True) = False Then
+            MsgBox "Unable to Update Spareparts Transaction!!!", vbCritical, "Warning"
+            GoTo endProc
+         End If
+         
+         lorsDetail.MoveNext
+      Loop Until lorsDetail.EOF
+   
+      ' undo loSpareparts transaction
+      loClient.InitTransaction
+      loClient.ClientType = xeClientCustomer
+      loClient.ClientId = .MasterOriginal("sClientID")
+      loClient.DebitAmount = .MasterOriginal("nTranTotl")
+      loClient.CreditAmount = .MasterOriginal("nAmtPaidx")
+      loClient.SourceSystem = "SP"
+      loClient.TransactDate = p_oBaseClas.MasterOriginal("dTransact")
+      If loClient.Sales(.Master("sTransNox"), True) = False Then
+         MsgBox "Unable to Update loSpareparts Transaction!!!", vbCritical, "Warning"
+         GoTo endProc
+      End If
+      
+      ' undo receipt transaction
+      If .MasterOriginal("nAmtPaidx") > 0# Then
+         lsSQL = "DELETE RECEIPT_MASTER" & _
+                  " WHERE sORNoxxxx = " & strParm(.MasterOriginal("sORNoxxxx")) & _
+                     " AND sBranchCd = " & strParm(.MasterOriginal("sBranchCd"))
+      
+         p_oAppDrivr.Connection.Execute lsSQL, lnRow, adCmdText
+         
+         If lnRow = 0 Then
+            MsgBox "Unable to Delete Receipt Transaction Info!!!", vbCritical, "Warning"
+            GoTo endProc
+         End If
+         
+         lsSQL = "DELETE Checks_Received" & _
+                  " WHERE sReferNox = " & strParm(p_axReceipt.TransNox) & _
+                     " AND sBranchCd = " & strParm(.Master("sBranchCd"))
+
+         p_oAppDrivr.Connection.Execute lsSQL, lnRow, adCmdText
+      End If
+   End With
+   
+   UndoTransaction = True
+
+endProc:
+   Set loSpareparts = Nothing
+   Set loClient = Nothing
+   p_oAppDrivr.ProcName lsOldProc
+   Exit Function
+errProc:
+   ShowError lsOldProc
+End Function
+
+Private Function SaveReceipt() As Boolean
+   Dim lsSQL As String
+   Dim lsOldProc As String
+   Dim lsRefNo As String
+   Dim lnRow As Long
+   Dim lnRefNo As Long
+   
+   lsOldProc = p_oAppDrivr.ProcName("SaveReceipt")
+   On Error GoTo errProc
+   SaveReceipt = False
+   
+   With p_oBaseClas
+      p_axReceipt.TransNox = GetNextCode("Receipt_Master", "sTransNox", True, _
+                                 p_oAppDrivr.Connection, True, p_sBranchCd)
+      lsSQL = "INSERT INTO Receipt_Master (" & _
+                  "  sTransNox" & _
+                  ", sORNoxxxx" & _
+                  ", dTransact" & _
+                  ", sSystemCd" & _
+                  ", sClientID" & _
+                  ", nCashAmtx" & _
+                  ", nCheckAmt" & _
+                  ", nDiscount" & _
+                  ", nOthersxx" & _
+                  ", cOffCollt" & _
+                  ", nTranTotl" & _
+                  ", sRemarksx" & _
+                  ", cCashierx" & _
+                  ", sAcctCode" & _
+                  ", cTranStat" & _
+                  ", sApproved" & _
+                  ", sModified" & _
+                  ", dModified )"
+      lsSQL = lsSQL & " VALUES (" & _
+                  " " & strParm(p_axReceipt.TransNox) & _
+                  ", " & strParm(p_axReceipt.ORNoxxxx) & _
+                  ", " & dateParm(.Master("dTransact")) & _
+                  ", 'SP'" & _
+                  ", " & strParm(.Master("sClientID")) & _
+                  ", " & p_axReceipt.CashAmtx & _
+                  ", " & p_axReceipt.CheckAmt & _
+                  ", 0.00" & _
+                  ", 0.00" & _
+                  ", " & strParm(xeYes) & _
+                  ", " & p_axReceipt.TranTotl & _
+                  ", " & strParm(p_axReceipt.Remarksx) & _
+                  ", " & strParm(xeYes) & _
+                  ", ''" & _
+                  ", 0" & _
+                  ", ''" & _
+                  ", " & strParm(Encrypt(p_oAppDrivr.UserID)) & _
+                  ", " & dateParm(p_oAppDrivr.ServerDate) & ")"
+      p_oAppDrivr.Connection.Execute lsSQL, lnRow, adCmdText
+      
+      If lnRow = 0 Then
+         MsgBox "Unable to Update Transaction Payment!!!", vbCritical, "Warning"
+         GoTo endProc
+      End If
+      
+      If p_axReceipt.CheckAmt > 0 Then
+         lsRefNo = GetNextCode("Checks_Received", "sCheckIDx", True, _
+                                 p_oAppDrivr.Connection, True, p_sBranchCd)
+         lnRefNo = CLng(Mid(lsRefNo, 5))
+         For pnCtr = 0 To 4
+            If p_axChecks(pnCtr).Amountxx > 0# Then
+               lsSQL = "INSERT INTO Checks_Received (" & _
+                           "  sCheckIDx" & _
+                           ", sReferNox" & _
+                           ", sCheckNox" & _
+                           ", sAcctNoxx" & _
+                           ", sBankName" & _
+                           ", dCheckDte" & _
+                           ", nAmountxx" & _
+                           ", nClearing" & _
+                           ", cChckStat" & _
+                           ", cDepositd )" & _
+                        " VALUES ("
+               lsSQL = lsSQL & _
+                           " " & strParm(lsRefNo) & _
+                           ", " & strParm(p_axReceipt.TransNox) & _
+                           ", " & strParm(p_axChecks(pnCtr).CheckNox) & _
+                           ", " & strParm(p_axChecks(pnCtr).AcctNoxx) & _
+                           ", " & strParm(p_axChecks(pnCtr).BankName) & _
+                           ", " & dateParm(p_axChecks(pnCtr).CheckDte) & _
+                           ", " & p_axChecks(pnCtr).Amountxx & _
+                           ", 10" & _
+                           ", 0" & _
+                           ", 0 )"
+               p_oAppDrivr.Connection.Execute lsSQL, lnRow, adCmdText
+               If lnRow = 0 Then
+                  MsgBox "Unable to Update Transaction Payment!!!", vbCritical, "Warning"
+                  GoTo endProc
+               End If
+               
+               lnRefNo = lnRefNo + 1
+               lsRefNo = p_sBranchCd & Format(.ServerDate, "YY") & Format(lnRefNo, String(6, "0"))
+            End If
+         Next
+      End If
+   End With
+   SaveReceipt = True
+
+endProc:
+   p_oAppDrivr.ProcName lsOldProc
+   Exit Function
+errProc:
+   ShowError lsOldProc
+End Function
+
+Private Function isTotalDiscOK() As Boolean
+   Dim lnItemPrice As Double
+   Dim lnDiscPrice As Double
+   Dim lnDiscount As Double
+   Dim lnMDiscount As Double
+   Dim lnSDiscount As Double
+   Dim lsAppvID As String
+   Dim lsAppvName As String
+   Dim lnAppvRights As Integer
+   Dim lbGetApproval As Boolean
+                                                                                                          
+   isTotalDiscOK = False
+                                                                                                          
+   lnAppvRights = p_oAppDrivr.UserLevel
+   
+   With p_oBaseClas
+      lnSDiscount = 0
+      lnMDiscount = 0
+      lnDiscount = 0
+      For pnCtr = 0 To .ItemCount - 1
+         If .Detail(pnCtr, "sBarrCode") = "" Then Exit For
+         
+         lnItemPrice = .Detail(pnCtr, "nSelPrice") * .Detail(pnCtr, "nQuantity")
+         lnMDiscount = lnMDiscount + _
+                  Round(lnItemPrice * .Detail(pnCtr, "nMMaxDisc") / 100, 2)
+         lnSDiscount = lnSDiscount + _
+                  Round(lnItemPrice * .Detail(pnCtr, "nSMaxDisc") / 100, 2)
+         lnDiscPrice = .Detail(pnCtr, "nUnitPrce") * .Detail(pnCtr, "nQuantity")
+         lnDiscPrice = (lnItemPrice - lnDiscPrice) + Round(lnDiscPrice * .Detail(pnCtr, "nDiscount") / 100, 2)
+         lnDiscount = lnDiscount + lnDiscPrice
+      Next
+      
+      lnDiscount = lnDiscount + _
+                  Round(.Master("nTranTotl") * .Master("nDiscRate") / 100, 2) + _
+                  .Master("nAddDiscx")
+      
+      If lnDiscount = 0# Then
+         isTotalDiscOK = True
+         GoTo endProc
+      End If
+      
+      lbGetApproval = False
+      If p_oAppDrivr.UserLevel = xeEncoder Then
+         lbGetApproval = True
+      ElseIf p_oAppDrivr.UserLevel = xeSupervisor And lnSDiscount < lnDiscount Then
+         lbGetApproval = True
+      ElseIf p_oAppDrivr.UserLevel = xeManager And lnMDiscount < lnDiscount Then
+         lbGetApproval = True
+      End If
+      
+      If lbGetApproval Then
+         If GetApproval(p_oAppDrivr, lnAppvRights, lsAppvID, lsAppvName) = False Then GoTo endProc
+         
+         If lnAppvRights = xeSupervisor Then
+            If lnSDiscount < lnDiscount Then
+               MsgBox "Discount is not within the range of the approving officer!!!" & vbCrLf & _
+                  "Request can not be granted!!!", vbCritical, "Warning"
+               GoTo endProc
+            End If
+         ElseIf lnAppvRights = xeManager Then
+            If lnMDiscount < lnDiscount Then
+               MsgBox "Discount is not within the range of the approving officer!!!" & vbCrLf & _
+                  "Request can not be granted!!!", vbCritical, "Warning"
+               GoTo endProc
+            End If
+         ElseIf Not (lnAppvRights = xeSysOwner Or lnAppvRights = xeEngineer) Then
+            MsgBox "User is not allowed to approved discount!!!" & vbCrLf & _
+                  "Request can not be granted!!!", vbCritical, "Warning"
+            GoTo endProc
+         End If
+         .Master("sApproved") = lsAppvName
+      End If
+   End With
+   isTotalDiscOK = True
+
+endProc:
+   Exit Function
+End Function
+
+Private Sub p_oBaseClas_DetailRetrieved(ByVal Index As Integer)
+   RaiseEvent DetailRetrieved(Index)
+End Sub
+
+Private Sub p_oBaseClas_InitValue()
+   Dim lnRow As Long
+
+   With p_oBaseClas
+      .Master("sTransNox") = .GetNextTrans("sTransNox", _
+                                          "sBranchCd = " & strParm(p_oAppDrivr.BranchCode))
+      .Master("sBranchCd") = p_oAppDrivr.BranchCode
+      .Master("dTransact") = Date
+      .Master("sEstimtNo") = ""
+      .Master("sCompnyNm") = ""
+      .Master("sTermIDxx") = ""
+      .Master("nTranTotl") = 0#
+      .Master("nDiscRate") = 0#
+      .Master("dDueDatex") = 0#
+      .Master("nAddDiscx") = 0#
+      .Master("nFreightx") = 0#
+      .Master("nNetTotal") = 0#
+      .Master("nAmtPaidx") = 0#
+      .Master("sRemarksx") = ""
+      .Master("cTranStat") = xeStateOpen
+      .Master("sApproved") = ""
+      .Master("nRightsxx") = 0
+      .Master("sClientID") = ""
+
+      .Detail(0, "nEntryNox") = 1
+      .Detail(0, "sBarrCode") = ""
+      .Detail(0, "sDescript") = ""
+      .Detail(0, "sTypeName") = ""
+      .Detail(0, "sModelNme") = ""
+      .Detail(0, "nQtyOnHnd") = 0
+      .Detail(0, "nUnitPrce") = 0#
+      .Detail(0, "nQuantity") = 0
+      .Detail(0, "nDiscount") = 0
+      .Detail(0, "sTransNox") = ""
+      .Detail(0, "sBranchCd") = ""
+   End With
+   
+   With p_axReceipt
+      .TransNox = GetNextCode("Receipt_Master", "sTransNox", True, p_oAppDrivr.Connection)
+      .TranTotl = 0#
+      .CashAmtx = 0#
+      .CheckAmt = 0#
+      .Remarksx = ""
+   End With
+   
+   For pnCtr = 0 To UBound(p_axChecks)
+      p_axChecks(pnCtr).AcctNoxx = ""
+      p_axChecks(pnCtr).BankName = ""
+      p_axChecks(pnCtr).CheckNox = ""
+      p_axChecks(pnCtr).CheckDte = Date
+      p_axChecks(pnCtr).Amountxx = 0
+   Next
+   
+   p_sFullName = ""
+   p_sAddressx = ""
+End Sub
+
+Private Sub p_oBaseClas_LoadOthers()
+   With p_oBaseClas
+      p_sFullName = .Master("xFullName")
+      p_sAddressx = .Master("xAddressx")
+   End With
+End Sub
+
+Private Sub p_oBaseClas_MasterRetrieved(ByVal Index As Integer)
+   RaiseEvent MasterRetrieved(Index)
+End Sub
+
+Private Sub p_oBaseClas_WillCancel(Cancel As Boolean)
+   Cancel = Not UndoTransaction
+End Sub
+
+Private Sub p_oBaseClas_WillDelete(Cancel As Boolean)
+   Dim lsOldProc As String
+   Dim lsSQL As String
+   Dim lnCtr As Long
+
+   lsOldProc = p_oAppDrivr.ProcName("WillDelete")
+   On Error GoTo errProc
+
+   Cancel = Not UndoTransaction
+
+endProc:
+   p_oAppDrivr.ProcName lsOldProc
+   Exit Sub
+errProc:
+   ShowError lsOldProc
+End Sub
+
+Private Sub p_oBaseClas_WillSave(Cancel As Boolean)
+   Dim loSpareparts As clsSpareparts
+   Dim lsOldProc As String
+   Dim lsSQL As String
+   Dim lnRow As Long
+
+   lsOldProc = p_oAppDrivr.ProcName("WillSave")
+   On Error GoTo errProc
+
+   With p_oBaseClas
+      If .EditMode = xeModeUpdate Then
+         If UndoTransaction = False Then
+            Cancel = True
+            GoTo endProc
+         End If
+      End If
+   
+      Set loSpareparts = New clsSpareparts
+      Set loSpareparts.AppDriver = p_oAppDrivr
+   
+      loSpareparts.InitTransaction
+      loSpareparts.Branch = .Master("sBranchCd")
+      loSpareparts.TransactDate = .Master("dTransact")
+      For pnCtr = 0 To .ItemCount - 1
+         If .Detail(pnCtr, 1) = "" Then Exit For
+   
+         .Detail(pnCtr, "nEntryNox") = pnCtr + 1
+         .Detail(pnCtr, "sTransNox") = .Master("sTransNox")
+         .Detail(pnCtr, "sBranchCd") = .Master("sBranchCd")
+   
+         loSpareparts.EntryNo = .Detail(pnCtr, "nEntryNox")
+         loSpareparts.BarrCode = .Detail(pnCtr, "sBarrCode")
+         loSpareparts.Quantity = .Detail(pnCtr, "nQuantity")
+         
+         ' if a spareparts is not successfully updated, cancel saving.
+         If loSpareparts.Sales(.Master("sTransNox")) = False Then
+            MsgBox "Unable to Update Spareparts Transaction!!!", vbCritical, "Warning"
+            Cancel = True
+            GoTo endProc
+         End If
+      Next
+   End With
+   
+endProc:
+   Set loSpareparts = Nothing
+   p_oAppDrivr.ProcName lsOldProc
+   Exit Sub
+errProc:
+   ShowError lsOldProc
+End Sub
+
+
